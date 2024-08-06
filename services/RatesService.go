@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 	"time"
-	"uacc-backend/src/integrations"
+	"uacc-backend/integrations"
 )
 
 type CurrencyRate struct {

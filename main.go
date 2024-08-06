@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 	"time"
-	"uacc-backend/src/integrations"
-	"uacc-backend/src/services"
+	integrations2 "uacc-backend/integrations"
+	services2 "uacc-backend/services"
 )
 
 type PathResponse struct {
@@ -28,7 +28,7 @@ type RateResponse struct {
 }
 
 type Data struct {
-	symbols services.SymbolsResponse
+	symbols services2.SymbolsResponse
 	rates   map[string]map[string]RateResponse
 }
 
@@ -36,10 +36,10 @@ var data = &Data{}
 
 func main() {
 	log.Println("Starting up...")
-	openExchangeAgent := integrations.NewOpenExchangeProxyAgent(getOrCrash("openExchangeApiKey"))
-	agents := []integrations.ProxyAgent{openExchangeAgent}
-	ratesService := services.NewRatesService(agents)
-	symbolsService := services.NewSymbolsService(agents)
+	openExchangeAgent := integrations2.NewOpenExchangeProxyAgent(getOrCrash("openExchangeApiKey"))
+	agents := []integrations2.ProxyAgent{openExchangeAgent}
+	ratesService := services2.NewRatesService(agents)
+	symbolsService := services2.NewSymbolsService(agents)
 
 	log.Println("Getting initial data...")
 	err := update(symbolsService, ratesService, data)
@@ -71,7 +71,7 @@ func main() {
 	log.Fatal(http.ListenAndServe(":"+port, wrapped))
 }
 
-func update(symbolsService services.SymbolsService, ratesService services.RatesService, data *Data) error {
+func update(symbolsService services2.SymbolsService, ratesService services2.RatesService, data *Data) error {
 	log.Println("Updating...")
 	symbols, err := symbolsService.GetSymbols()
 	if err != nil {

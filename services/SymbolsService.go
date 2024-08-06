@@ -3,7 +3,7 @@ package services
 import (
 	"fmt"
 	"sync"
-	"uacc-backend/src/integrations"
+	"uacc-backend/integrations"
 )
 
 type SymbolsResponse map[string]string
