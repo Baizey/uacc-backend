@@ -1,0 +1,60 @@
+# Docs for the Azure Web Apps Deploy action: https://go.microsoft.com/fwlink/?linkid=2134798
+# More GitHub Actions for Azure: https://go.microsoft.com/fwlink/?linkid=2135048
+
+name: Azure App Service - uacc-bff-api(Production), Build and deploy NodeJS app
+
+on:
+  push:
+    branches:
+      - Api
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install dependencies
+        run: go mod tidy
+
+      - name: Build
+        run: go build -o myapp
+
+      - name: Upload
+        uses: actions/upload-artifact@v3
+        with:
+          name: go-app
+          path: myapp
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download
+        uses: actions/download-artifact@v3
+        with:
+          name: go-app
+
+      - name: Deploy
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: uacc-bff-api
+          slot-name: Production
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_UACC }}
+          package: myapp
+
