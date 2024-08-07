@@ -36,6 +36,7 @@ var data = &Data{}
 
 func main() {
 	log.Println("Starting up...")
+
 	openExchangeAgent := integrations2.NewOpenExchangeProxyAgent(getOrCrash("openExchangeApiKey"))
 	agents := []integrations2.ProxyAgent{openExchangeAgent}
 	ratesService := services2.NewRatesService(agents)
