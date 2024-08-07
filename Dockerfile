@@ -12,7 +12,7 @@ RUN apt-get update && \
     apt-get install -y ca-certificates && \
     rm -rf /var/lib/apt/lists/* \
 
-EXPOSE $PORT
+EXPOSE 8080
 
 COPY --from=builder /app/server .
 CMD ./server
