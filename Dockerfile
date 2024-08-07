@@ -12,7 +12,7 @@ RUN apt-get update && \
     apt-get install -y ca-certificates && \
     rm -rf /var/lib/apt/lists/* \
 
-ENV PORT=8080
+ENV PORT=80
 
 EXPOSE $PORT
 
