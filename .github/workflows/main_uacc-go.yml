@@ -47,4 +47,4 @@ jobs:
         app-name: 'uacc-go'
         slot-name: 'production'
         publish-profile: ${{ secrets.AzureAppService_PublishProfile_72d80ecd306f414ba086ff188d499b7d }}b
-        images: 'index.docker.io/${{ secrets.AzureAppService_ContainerUsername_e8d26b25c6b34945ba3a4597c5a1ab0e }}/uacc-backend:${{ githu.sha }}'
+        images: 'index.docker.io/${{ secrets.AzureAppService_ContainerUsername_e8d26b25c6b34945ba3a4597c5a1ab0e }}/uacc-backend:${{ github.sha }}'
