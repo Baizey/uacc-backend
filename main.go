@@ -97,10 +97,17 @@ func update(symbolsService services2.SymbolsService, ratesService services2.Rate
 				item.From = from
 				item.To = to
 				item.Timestamp = fromToRate.Timestamp.Unix()
-				item.Path = make([]PathResponse, 0)
 				item.Rate = fromToRate.Rate
+				item.Path = []PathResponse{
+					{
+						From:      item.From,
+						To:        item.To,
+						Rate:      item.Rate,
+						Source:    fromToRate.Source,
+						Timestamp: item.Timestamp,
+					},
+				}
 				tmp[from][to] = item
-				//log.Printf("%s -> %s %f\n", from, to, item.rate)
 			}
 
 			_, hasTo := tmp[to]
@@ -114,10 +121,17 @@ func update(symbolsService services2.SymbolsService, ratesService services2.Rate
 				item.From = to
 				item.To = from
 				item.Timestamp = fromToRate.Timestamp.Unix()
-				item.Path = make([]PathResponse, 0)
 				item.Rate = 1. / fromToRate.Rate
+				item.Path = []PathResponse{
+					{
+						From:      item.To,
+						To:        item.From,
+						Rate:      item.Rate,
+						Source:    fromToRate.Source,
+						Timestamp: item.Timestamp,
+					},
+				}
 				tmp[to][from] = item
-				//log.Printf("%s -> %s %f\n", to, from, item.rate)
 			}
 
 			for toOther, fromOtherRate := range rates[from] {
@@ -129,6 +143,22 @@ func update(symbolsService services2.SymbolsService, ratesService services2.Rate
 					item.Timestamp = fromToRate.Timestamp.Unix()
 					item.Path = make([]PathResponse, 0)
 					item.Rate = tmp[to][from].Rate * fromOtherRate.Rate
+					item.Path = []PathResponse{
+						{
+							From:      to,
+							To:        from,
+							Rate:      tmp[to][from].Rate,
+							Source:    fromToRate.Source,
+							Timestamp: item.Timestamp,
+						},
+						{
+							From:      from,
+							To:        toOther,
+							Rate:      fromOtherRate.Rate,
+							Source:    fromOtherRate.Source,
+							Timestamp: item.Timestamp,
+						},
+					}
 					tmp[to][toOther] = item
 				}
 			}
