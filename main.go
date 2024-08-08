@@ -1,46 +1,25 @@
 package main
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
-	"os"
-	"strings"
 	"time"
-	integrations2 "uacc-backend/integrations"
-	services2 "uacc-backend/services"
+	"uacc-backend/contract"
+	"uacc-backend/integrations"
+	"uacc-backend/routing"
+	"uacc-backend/services"
+	"uacc-backend/util"
 )
 
-type PathResponse struct {
-	Source    string  `json:"source"`
-	From      string  `json:"from"`
-	To        string  `json:"to"`
-	Rate      float64 `json:"rate"`
-	Timestamp int64   `json:"timestamp"`
-}
-
-type RateResponse struct {
-	From      string         `json:"from"`
-	To        string         `json:"to"`
-	Rate      float64        `json:"rate"`
-	Timestamp int64          `json:"timestamp"`
-	Path      []PathResponse `json:"path"`
-}
-
-type Data struct {
-	symbols services2.SymbolsResponse
-	rates   map[string]map[string]RateResponse
-}
-
-var data = &Data{}
-
 func main() {
+	data := &contract.Data{}
 	log.Println("Starting up...")
 
-	openExchangeAgent := integrations2.NewOpenExchangeProxyAgent(getOrCrash("openExchangeApiKey"))
-	agents := []integrations2.ProxyAgent{openExchangeAgent}
-	ratesService := services2.NewRatesService(agents)
-	symbolsService := services2.NewSymbolsService(agents)
+	agents := []integrations.ProxyAgent{
+		integrations.NewOpenExchangeProxyAgent(util.GetOrCrash("openExchangeApiKey")),
+	}
+	ratesService := services.NewRatesService(agents)
+	symbolsService := services.NewSymbolsService(agents)
 
 	log.Println("Getting initial data...")
 	err := update(symbolsService, ratesService, data)
@@ -62,43 +41,44 @@ func main() {
 	}()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/health", handleHealth)
-	mux.HandleFunc("/api/v4/symbols", handleSymbols)
-	mux.HandleFunc("/api/v4/rate/", handleRates)
-	wrapped := validateApikey(mux)
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
+	routing.SetupSymbols(data, mux)
+	routing.SetupRates(data, mux)
+	routing.SetupLocalizations(mux)
+	wrapped := routing.SetupMiddleware(mux)
 
 	log.Println("Starting up server...")
-	port := getOrDefault("PORT", "3001")
+	port := util.GetOrDefault("PORT", "3001")
 	log.Fatal(http.ListenAndServe(":"+port, wrapped))
 }
 
-func update(symbolsService services2.SymbolsService, ratesService services2.RatesService, data *Data) error {
+func update(symbolsService services.SymbolsService, ratesService services.RatesService, data *contract.Data) error {
 	log.Println("Updating...")
 	symbols, err := symbolsService.GetSymbols()
 	if err != nil {
 		return err
 	}
-	data.symbols = symbols
+	data.Symbols = symbols
 
 	rates, err := ratesService.GetRates()
 	if err != nil {
 		return err
 	}
-	tmp := make(map[string]map[string]RateResponse)
+	tmpRates := make(map[string]map[string]contract.RateResponse)
 	for from := range rates {
-		_, err := tmp[from]
+		_, err := tmpRates[from]
 		if !err {
-			tmp[from] = make(map[string]RateResponse)
+			tmpRates[from] = make(map[string]contract.RateResponse)
 		}
 		for to, fromToRate := range rates[from] {
-			_, hasFromTo := tmp[from][to]
+			_, hasFromTo := tmpRates[from][to]
 			if hasFromTo {
-				item := RateResponse{}
+				item := contract.RateResponse{}
 				item.From = from
 				item.To = to
 				item.Timestamp = fromToRate.Timestamp.Unix()
 				item.Rate = fromToRate.Rate
-				item.Path = []PathResponse{
+				item.Path = []contract.PathResponse{
 					{
 						From:      item.From,
 						To:        item.To,
@@ -107,22 +87,22 @@ func update(symbolsService services2.SymbolsService, ratesService services2.Rate
 						Timestamp: item.Timestamp,
 					},
 				}
-				tmp[from][to] = item
+				tmpRates[from][to] = item
 			}
 
-			_, hasTo := tmp[to]
+			_, hasTo := tmpRates[to]
 			if !hasTo {
-				tmp[to] = make(map[string]RateResponse)
+				tmpRates[to] = make(map[string]contract.RateResponse)
 			}
 
-			_, hasToFrom := tmp[to][from]
+			_, hasToFrom := tmpRates[to][from]
 			if !hasToFrom {
-				item := RateResponse{}
+				item := contract.RateResponse{}
 				item.From = to
 				item.To = from
 				item.Timestamp = fromToRate.Timestamp.Unix()
 				item.Rate = 1. / fromToRate.Rate
-				item.Path = []PathResponse{
+				item.Path = []contract.PathResponse{
 					{
 						From:      item.To,
 						To:        item.From,
@@ -131,23 +111,23 @@ func update(symbolsService services2.SymbolsService, ratesService services2.Rate
 						Timestamp: item.Timestamp,
 					},
 				}
-				tmp[to][from] = item
+				tmpRates[to][from] = item
 			}
 
 			for toOther, fromOtherRate := range rates[from] {
-				_, hasToOther := tmp[to][toOther]
+				_, hasToOther := tmpRates[to][toOther]
 				if !hasToOther {
-					item := RateResponse{}
+					item := contract.RateResponse{}
 					item.From = to
 					item.To = toOther
 					item.Timestamp = fromToRate.Timestamp.Unix()
-					item.Path = make([]PathResponse, 0)
-					item.Rate = tmp[to][from].Rate * fromOtherRate.Rate
-					item.Path = []PathResponse{
+					item.Path = make([]contract.PathResponse, 0)
+					item.Rate = tmpRates[to][from].Rate * fromOtherRate.Rate
+					item.Path = []contract.PathResponse{
 						{
 							From:      to,
 							To:        from,
-							Rate:      tmp[to][from].Rate,
+							Rate:      tmpRates[to][from].Rate,
 							Source:    fromToRate.Source,
 							Timestamp: item.Timestamp,
 						},
@@ -159,83 +139,26 @@ func update(symbolsService services2.SymbolsService, ratesService services2.Rate
 							Timestamp: item.Timestamp,
 						},
 					}
-					tmp[to][toOther] = item
+					tmpRates[to][toOther] = item
 				}
 			}
 		}
 	}
-	data.rates = tmp
+	data.Rates = tmpRates
+
+	tmpNewRates := make(map[string]contract.RatesResponse)
+	for to := range tmpRates {
+		rateResponses := make([]contract.RateResponse, len(tmpRates))
+		i := 0
+		for from := range tmpRates {
+			rateResponses[i] = tmpRates[from][to]
+			i++
+		}
+		resp := contract.RatesResponse{}
+		resp.Rates = rateResponses
+		tmpNewRates[to] = resp
+	}
+	data.NewRates = tmpNewRates
+
 	return nil
-}
-
-func validateApikey(next http.Handler) http.Handler {
-	apikey := getOrCrash("ownApiKey")
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/health" {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		key := r.Header.Get("x-apikey")
-		if key != apikey {
-			http.Error(w, "Forbidden", http.StatusForbidden)
-			return
-		}
-
-		next.ServeHTTP(w, r)
-	})
-}
-
-func handleSymbols(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	result := data.symbols
-	if err := json.NewEncoder(w).Encode(result); err != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-	}
-}
-
-func handleRates(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	path := r.URL.Path[len("/api/v4/rate/"):]
-	parts := strings.Split(path, "/")
-	if len(parts) != 2 {
-		http.Error(w, "Expect path like /api/v4/rate/{from}/{to}", http.StatusBadRequest)
-		return
-	}
-	from := parts[0]
-	to := parts[1]
-
-	result, hasRate := data.rates[from][to]
-	log.Printf("Handling %s -> %s %+v\n", from, to, result)
-	if !hasRate {
-		http.Error(w, "Rate not found", http.StatusNotFound)
-		return
-	}
-
-	if err := json.NewEncoder(w).Encode(result); err != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		return
-	}
-}
-
-func handleHealth(w http.ResponseWriter, _ *http.Request) {
-	w.WriteHeader(http.StatusOK)
-}
-
-func getOrCrash(key string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		log.Fatalf("Missing env variable %s", key)
-	}
-	return value
-}
-func getOrDefault(key string, defaultValue string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		log.Printf("Missing env variable %s using default %s", key, defaultValue)
-		return defaultValue
-	}
-	log.Printf("Have env variable %s using %s", key, defaultValue)
-	return value
 }
