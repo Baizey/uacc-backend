@@ -76,7 +76,7 @@ func update(symbolsService services.SymbolsService, ratesService services.RatesS
 				item := contract.RateResponse{}
 				item.From = from
 				item.To = to
-				item.Timestamp = fromToRate.Timestamp.Unix()
+				item.Timestamp = fromToRate.Timestamp.UnixMilli()
 				item.Rate = fromToRate.Rate
 				item.Path = []contract.PathResponse{
 					{
@@ -100,7 +100,7 @@ func update(symbolsService services.SymbolsService, ratesService services.RatesS
 				item := contract.RateResponse{}
 				item.From = to
 				item.To = from
-				item.Timestamp = fromToRate.Timestamp.Unix()
+				item.Timestamp = fromToRate.Timestamp.UnixMilli()
 				item.Rate = 1. / fromToRate.Rate
 				item.Path = []contract.PathResponse{
 					{
@@ -120,7 +120,7 @@ func update(symbolsService services.SymbolsService, ratesService services.RatesS
 					item := contract.RateResponse{}
 					item.From = to
 					item.To = toOther
-					item.Timestamp = fromToRate.Timestamp.Unix()
+					item.Timestamp = fromToRate.Timestamp.UnixMilli()
 					item.Path = make([]contract.PathResponse, 0)
 					item.Rate = tmpRates[to][from].Rate * fromOtherRate.Rate
 					item.Path = []contract.PathResponse{

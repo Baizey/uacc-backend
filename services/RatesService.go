@@ -54,7 +54,8 @@ func (service *RatesServiceImpl) GetRates() (CurrencyRateLookup, error) {
 
 	result := make(CurrencyRateLookup)
 	for rates := range resultsChannel {
-		if result[rates.Base] == nil {
+		_, hasRate := result[rates.Base]
+		if !hasRate {
 			result[rates.Base] = make(map[string]CurrencyRate)
 		}
 		base := result[rates.Base]
