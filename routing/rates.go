@@ -2,7 +2,6 @@ package routing
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"strings"
 	"uacc-backend/contract"
@@ -24,7 +23,7 @@ func SetupRates(
 		to := parts[1]
 
 		result, hasRate := data.Rates[from][to]
-		log.Printf("Handling %s -> %s %+v\n", from, to, result)
+		//log.Printf("Handling %s -> %s %+v\n", from, to, result)
 		if !hasRate {
 			http.Error(w, "Rate not found", http.StatusNotFound)
 			return
